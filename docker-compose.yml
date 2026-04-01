@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ais_shop
+    environment:
+      POSTGRES_DB: ais_shop_db
+      POSTGRES_USER: ais_admin
+      POSTGRES_PASSWORD: ais_admin_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ais_admin -d ais_shop_db"]
+      interval: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ais_shop_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ais-shop.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
