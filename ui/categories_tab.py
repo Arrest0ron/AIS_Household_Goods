@@ -1,10 +1,13 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit,
-    QTableWidget, QTableWidgetItem, QMessageBox, QFileDialog
+    QTableWidget, QTableWidgetItem, QMessageBox, QFileDialog, QComboBox
 )
 from repositories.category_repository import CategoryRepository
 from ui.dialogs import CategoryDialog
 from services.pdf_reports import ReportService
+import logging
+
+log = logging.getLogger("ui.categories")
 
 
 class CategoriesTab(QWidget):
@@ -16,6 +19,10 @@ class CategoriesTab(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Поиск по названию")
 
+        self.filter_combo = QComboBox()
+        self.filter_combo.addItems(["Все", "Только 18+", "Без 18+"])
+        self.filter_combo.currentIndexChanged.connect(self.apply_filter)
+
         self.search_btn = QPushButton("Найти")
         self.add_btn = QPushButton("Добавить")
         self.edit_btn = QPushButton("Изменить")
@@ -26,10 +33,12 @@ class CategoriesTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
+        self.table.setSortingEnabled(True)
 
         top = QHBoxLayout()
         top.addWidget(self.search_input)
         top.addWidget(self.search_btn)
+        top.addWidget(self.filter_combo)
         top.addWidget(self.add_btn)
         top.addWidget(self.edit_btn)
         top.addWidget(self.delete_btn)
@@ -62,7 +71,18 @@ class CategoriesTab(QWidget):
     def search(self):
         text = self.search_input.text().strip()
         rows = self.repo.search(text) if text else self.repo.get_all()
-        self.fill_table(rows)
+        self.fill_table(self._apply_adult_filter(rows))
+
+    def apply_filter(self):
+        self.search()
+
+    def _apply_adult_filter(self, rows):
+        idx = self.filter_combo.currentIndex()
+        if idx == 1:
+            return [r for r in rows if r.get("adult_flag")]
+        elif idx == 2:
+            return [r for r in rows if not r.get("adult_flag")]
+        return rows
 
     def fill_table(self, rows):
         self.current_ids = [row["category_id"] for row in rows]
@@ -73,8 +93,20 @@ class CategoriesTab(QWidget):
         self.table.resizeColumnsToContents()
 
     def add(self):
-        dialog = CategoryDialog(self)
-        if dialog.exec_():
+        log.info("Открываем диалог добавления категории")
+        try:
+            dialog = CategoryDialog(self)
+            log.info("CategoryDialog создан")
+        except Exception:
+            log.exception("Ошибка при создании CategoryDialog")
+            return
+        try:
+            result = dialog.exec()
+            log.info("dialog.exec() вернул: %s", result)
+        except Exception:
+            log.exception("Ошибка при dialog.exec()")
+            return
+        if result:
             data = dialog.get_data()
             if not data["category_name"]:
                 QMessageBox.warning(self, "Ошибка", "Введите название категории")
@@ -94,7 +126,7 @@ class CategoriesTab(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
             return
         dialog = CategoryDialog(self, data=data)
-        if dialog.exec_():
+        if dialog.exec():
             data = dialog.get_data()
             if not data["category_name"]:
                 QMessageBox.warning(self, "Ошибка", "Введите название категории")

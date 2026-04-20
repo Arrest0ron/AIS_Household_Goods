@@ -17,8 +17,9 @@ from repositories.order_repository import OrderRepository
 from datetime import datetime
 
 
-pdfmetrics.registerFont(TTFont("Helvetica", "C:\\Windows\\Fonts\\arial.ttf"))
-pdfmetrics.registerFont(TTFont("Helvetica-Bold", "C:\\Windows\\Fonts\\arialbd.ttf"))
+_font_dir = os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts")
+pdfmetrics.registerFont(TTFont("Helvetica", os.path.join(_font_dir, "arial.ttf")))
+pdfmetrics.registerFont(TTFont("Helvetica-Bold", os.path.join(_font_dir, "arialbd.ttf")))
 
 
 class PDFReport:
@@ -194,7 +195,7 @@ class ReportService:
             f'{float(r["price"]):.2f}', r["stock_quantity"],
             f'{float(r["price"]) * r["stock_quantity"]:.2f}'
         ] for i, r in enumerate(rows)]
-        pdf.add_table(headers, data, col_widths=[20, 120, 80, 60, 50, 70])
+        pdf.add_table(headers, data, col_widths=[30, 120, 80, 60, 50, 70])
         pdf.build(filepath)
 
     def low_stock_report(self, filepath, threshold=10):

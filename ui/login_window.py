@@ -1,3 +1,4 @@
+import logging
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLineEdit, QPushButton, QMessageBox, QLabel, QFrame
 )
@@ -6,6 +7,8 @@ from services.auth_service import AuthService
 from session import Session
 from ui.admin_main_window import AdminMainWindow
 from ui.user_main_window import UserMainWindow
+
+log = logging.getLogger("ui.login")
 
 
 class LoginWindow(QWidget):
@@ -116,12 +119,18 @@ class LoginWindow(QWidget):
         Session.login(user)
         self.hide()
 
-        if Session.is_admin():
-            self.child_window = AdminMainWindow(self)
-        else:
-            self.child_window = UserMainWindow(self)
-
-        self.child_window.show()
+        try:
+            if Session.is_admin():
+                log.info("Открываем окно администратора")
+                self.child_window = AdminMainWindow(self)
+            else:
+                log.info("Открываем окно пользователя")
+                self.child_window = UserMainWindow(self)
+            self.child_window.show()
+        except Exception:
+            log.exception("Краш при открытии главного окна после входа")
+            QMessageBox.critical(self, "Ошибка",
+                "Критическая ошибка при открытии окна.\nСмотрите файл логов в папке logs/")
 
     def return_back(self):
         self.login_edit.clear()

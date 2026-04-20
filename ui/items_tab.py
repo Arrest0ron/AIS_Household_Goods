@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit,
-    QTableWidget, QTableWidgetItem, QMessageBox, QFileDialog
+    QTableWidget, QTableWidgetItem, QMessageBox, QFileDialog, QComboBox
 )
 from repositories.item_repository import ItemRepository
 from ui.dialogs import ItemDialog
@@ -16,6 +16,10 @@ class ItemsTab(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Поиск по названию")
 
+        self.filter_combo = QComboBox()
+        self.filter_combo.addItem("Все категории")
+        self.filter_combo.currentIndexChanged.connect(self.apply_filter)
+
         self.search_btn = QPushButton("Найти")
         self.add_btn = QPushButton("Добавить")
         self.edit_btn = QPushButton("Изменить")
@@ -25,10 +29,12 @@ class ItemsTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Название", "Категория", "Цена", "Остаток", "Масса (кг)"])
+        self.table.setSortingEnabled(True)
 
         top = QHBoxLayout()
         top.addWidget(self.search_input)
         top.addWidget(self.search_btn)
+        top.addWidget(self.filter_combo)
         top.addWidget(self.add_btn)
         top.addWidget(self.edit_btn)
         top.addWidget(self.delete_btn)
@@ -55,11 +61,32 @@ class ItemsTab(QWidget):
         return self.current_ids[row]
 
     def load_data(self):
+        cats = self.repo.get_categories()
+        self.filter_combo.blockSignals(True)
+        current = self.filter_combo.currentText()
+        self.filter_combo.clear()
+        self.filter_combo.addItem("Все категории")
+        for c in cats:
+            self.filter_combo.addItem(c["category_name"], c["category_id"])
+        idx = self.filter_combo.findText(current)
+        if idx >= 0:
+            self.filter_combo.setCurrentIndex(idx)
+        self.filter_combo.blockSignals(False)
         self.fill_table(self.repo.get_all())
 
     def search(self):
         text = self.search_input.text().strip()
-        self.fill_table(self.repo.search(text) if text else self.repo.get_all())
+        rows = self.repo.search(text) if text else self.repo.get_all()
+        self.fill_table(self._apply_category_filter(rows))
+
+    def apply_filter(self):
+        self.search()
+
+    def _apply_category_filter(self, rows):
+        cat_id = self.filter_combo.currentData()
+        if cat_id:
+            return [r for r in rows if r.get("category_id") == cat_id]
+        return rows
 
     def fill_table(self, rows):
         self.current_ids = [row["item_id"] for row in rows]
@@ -76,7 +103,7 @@ class ItemsTab(QWidget):
     def add(self):
         cats = self.repo.get_categories()
         dialog = ItemDialog(self, categories=cats)
-        if dialog.exec_():
+        if dialog.exec():
             self.repo.create(dialog.get_data())
             self.load_data()
 
@@ -92,7 +119,7 @@ class ItemsTab(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
             return
         dialog = ItemDialog(self, data=data, categories=cats)
-        if dialog.exec_():
+        if dialog.exec():
             try:
                 self.repo.update(item_id, dialog.get_data())
                 self.load_data()

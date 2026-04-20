@@ -25,6 +25,7 @@ class WarehousesTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["Адрес", "Вместимость", "Тип"])
+        self.table.setSortingEnabled(True)
 
         top = QHBoxLayout()
         top.addWidget(self.search_input)
@@ -72,7 +73,7 @@ class WarehousesTab(QWidget):
 
     def add(self):
         dialog = WarehouseDialog(self)
-        if dialog.exec_():
+        if dialog.exec():
             self.repo.create(dialog.get_data())
             self.load_data()
 
@@ -87,7 +88,7 @@ class WarehousesTab(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
             return
         dialog = WarehouseDialog(self, data=data)
-        if dialog.exec_():
+        if dialog.exec():
             try:
                 self.repo.update(warehouse_id, dialog.get_data())
                 self.load_data()

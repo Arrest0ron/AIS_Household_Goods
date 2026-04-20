@@ -123,9 +123,6 @@ CREATE TABLE login_history (history_id INT GENERATED ALWAYS AS IDENTITY PRIMARY 
 - [x] Login: 520×440, заголовок «АИС Магазина бытовых товаров»
 - [x] Git: 16 коммитов (01.04–26.04.2026), remote: github.com/Arrest0ron/AIS_Household_Goods.git
 
-### Блокировано / Что делать дальше
-- [ ] **Отсутствует таблица Stock (M:N Items ↔ Warehouses)** — нарушено ограничение #5: «На одном складе может храниться много товаров, и один товар может храниться на многих складах». Нужна новая таблица + репозиторий + UI-вкладка
-
 ### Ключевые решения
 - Auth через таблицу `users` + bcrypt, не через PostgreSQL roles — соответствует архитектуре аналога
 - `GENERATED ALWAYS AS IDENTITY` для автоинкремента

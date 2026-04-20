@@ -1,3 +1,4 @@
+import logging
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTabWidget, QLabel
 )
@@ -7,6 +8,8 @@ from ui.user_categories_tab import UserCategoriesTab
 from ui.user_items_tab import UserItemsTab
 from ui.user_new_order_tab import UserNewOrderTab
 from ui.user_history_tab import UserHistoryTab
+
+log = logging.getLogger("ui.user")
 
 
 class UserMainWindow(QMainWindow):
@@ -28,7 +31,7 @@ class UserMainWindow(QMainWindow):
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(16, 8, 16, 8)
 
-        app_title = QLabel("AIS_Shop")
+        app_title = QLabel("АИС Магазина бытовых товаров")
         app_title.setStyleSheet("color: #FFFFFF; font-size: 16pt; font-weight: 700; background: transparent;")
 
         role_badge = QLabel("Пользователь")
@@ -65,10 +68,20 @@ class UserMainWindow(QMainWindow):
 
         # Tabs
         self.tabs = QTabWidget()
-        self.tabs.addTab(UserCategoriesTab(), "Категории")
-        self.tabs.addTab(UserItemsTab(), "Товары")
-        self.tabs.addTab(UserNewOrderTab(), "Новый заказ")
-        self.tabs.addTab(UserHistoryTab(), "Мои заказы")
+        tab_classes = [
+            ("Категории", UserCategoriesTab),
+            ("Товары", UserItemsTab),
+            ("Новый заказ", UserNewOrderTab),
+            ("Мои заказы", UserHistoryTab),
+        ]
+        for name, cls in tab_classes:
+            try:
+                log.info("Инициализация вкладки: %s", name)
+                self.tabs.addTab(cls(), name)
+            except Exception:
+                log.exception("Ошибка при создании вкладки '%s'", name)
+                from PyQt6.QtWidgets import QWidget as W
+                self.tabs.addTab(W(), name)
 
         central = QWidget()
         layout = QVBoxLayout()

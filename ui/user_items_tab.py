@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit,
-    QTableWidget, QTableWidgetItem, QFileDialog, QMessageBox
+    QTableWidget, QTableWidgetItem, QFileDialog, QMessageBox, QComboBox
 )
 from repositories.item_repository import ItemRepository
 from services.pdf_reports import ReportService
@@ -15,15 +15,22 @@ class UserItemsTab(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Поиск по названию")
         self.search_btn = QPushButton("Найти")
+
+        self.filter_combo = QComboBox()
+        self.filter_combo.addItem("Все категории")
+        self.filter_combo.currentIndexChanged.connect(self.apply_filter)
+
         self.pdf_btn = QPushButton("PDF")
 
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Название", "Категория", "Цена (₽)", "Остаток", "Масса (кг)"])
+        self.table.setSortingEnabled(True)
 
         top = QHBoxLayout()
         top.addWidget(self.search_input)
         top.addWidget(self.search_btn)
+        top.addWidget(self.filter_combo)
         top.addStretch()
         top.addWidget(self.pdf_btn)
 
@@ -38,11 +45,32 @@ class UserItemsTab(QWidget):
         self.load_data()
 
     def load_data(self):
+        cats = self.repo.get_categories()
+        self.filter_combo.blockSignals(True)
+        current = self.filter_combo.currentText()
+        self.filter_combo.clear()
+        self.filter_combo.addItem("Все категории")
+        for c in cats:
+            self.filter_combo.addItem(c["category_name"], c["category_id"])
+        idx = self.filter_combo.findText(current)
+        if idx >= 0:
+            self.filter_combo.setCurrentIndex(idx)
+        self.filter_combo.blockSignals(False)
         self.fill_table(self.repo.get_all())
 
     def search(self):
         text = self.search_input.text().strip()
-        self.fill_table(self.repo.search(text) if text else self.repo.get_all())
+        rows = self.repo.search(text) if text else self.repo.get_all()
+        self.fill_table(self._apply_category_filter(rows))
+
+    def apply_filter(self):
+        self.search()
+
+    def _apply_category_filter(self, rows):
+        cat_id = self.filter_combo.currentData()
+        if cat_id:
+            return [r for r in rows if r.get("category_id") == cat_id]
+        return rows
 
     def fill_table(self, rows):
         self.table.setRowCount(len(rows))

@@ -1,11 +1,12 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QPushButton,
     QComboBox, QTextEdit, QTableWidget, QTableWidgetItem,
-    QMessageBox, QSpinBox, QDialog
+    QMessageBox, QSpinBox, QDialog, QLabel
 )
 from repositories.order_repository import OrderRepository
 from repositories.customer_repository import CustomerRepository
 from repositories.item_repository import ItemRepository
+from session import Session
 from datetime import date
 
 
@@ -13,13 +14,14 @@ class SelectItemDialog(QDialog):
     def __init__(self, items, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Выбор товара")
-        self.resize(500, 400)
+        self.resize(700, 500)
         self.selected_items = []
 
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["Название", "Цена (₽)", "Остаток", "Кол-во"])
         self.table.setRowCount(len(items))
+        self.table.verticalHeader().setDefaultSectionSize(64)
         self._items = items
 
         for i, item in enumerate(items):
@@ -57,9 +59,23 @@ class UserNewOrderTab(QWidget):
         self.item_repo = ItemRepository()
         self.order_items = []
 
-        # Customer selection
         self.customer_combo = QComboBox()
-        self.refresh_customers()
+        self.customer_label = QLabel()
+
+        user = Session.current_user or {}
+        self._customer_id = user.get("customer_id")
+
+        if self._customer_id:
+            self.customer_combo.hide()
+            try:
+                cust = self.customer_repo.get_by_id(self._customer_id)
+                name = cust.get("customer_name", "") if cust else ""
+                self.customer_label.setText(name)
+            except Exception:
+                self.customer_label.setText(f"ID: {self._customer_id}")
+        else:
+            self.customer_label.hide()
+            self.refresh_customers()
 
         self.desc_edit = QTextEdit()
         self.desc_edit.setMaximumHeight(60)
@@ -75,6 +91,7 @@ class UserNewOrderTab(QWidget):
 
         form = QFormLayout()
         form.addRow("Покупатель:", self.customer_combo)
+        form.addRow("Покупатель:", self.customer_label)
         form.addRow("Описание:", self.desc_edit)
 
         btn_row = QHBoxLayout()
@@ -114,7 +131,7 @@ class UserNewOrderTab(QWidget):
     def add_items(self):
         items = self.item_repo.get_all()
         dialog = SelectItemDialog(items, self)
-        if dialog.exec_():
+        if dialog.exec():
             selected = dialog.get_selected()
             for s in selected:
                 existing = next((x for x in self.order_items if x["item_id"] == s["item_id"]), None)
@@ -129,7 +146,10 @@ class UserNewOrderTab(QWidget):
         self.refresh_items_table()
 
     def submit_order(self):
-        customer_id = self.customer_combo.currentData()
+        if self._customer_id:
+            customer_id = self._customer_id
+        else:
+            customer_id = self.customer_combo.currentData()
         if customer_id is None:
             QMessageBox.warning(self, "Ошибка", "Выберите покупателя")
             return

@@ -25,6 +25,7 @@ class SuppliersTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels(["Название", "Контакты"])
+        self.table.setSortingEnabled(True)
 
         top = QHBoxLayout()
         top.addWidget(self.search_input)
@@ -71,7 +72,7 @@ class SuppliersTab(QWidget):
 
     def add(self):
         dialog = SupplierDialog(self)
-        if dialog.exec_():
+        if dialog.exec():
             self.repo.create(dialog.get_data())
             self.load_data()
 
@@ -86,7 +87,7 @@ class SuppliersTab(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
             return
         dialog = SupplierDialog(self, data=data)
-        if dialog.exec_():
+        if dialog.exec():
             try:
                 self.repo.update(supplier_id, dialog.get_data())
                 self.load_data()

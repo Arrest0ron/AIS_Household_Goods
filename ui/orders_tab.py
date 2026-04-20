@@ -1,10 +1,12 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QPushButton,
+    QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QPushButton, QLineEdit,
     QTableWidget, QTableWidgetItem, QMessageBox, QDialog, QFormLayout,
-    QComboBox, QSpinBox, QFileDialog
+    QComboBox, QSpinBox, QFileDialog, QDateEdit, QLabel
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QDate
 from repositories.order_repository import OrderRepository
+from repositories.customer_repository import CustomerRepository
+from repositories.item_repository import ItemRepository
 from ui.dialogs import OrderDialog
 from services.pdf_reports import ReportService
 
@@ -57,6 +59,8 @@ class OrdersTab(QWidget):
     def __init__(self):
         super().__init__()
         self.repo = OrderRepository()
+        self.customer_repo = CustomerRepository()
+        self.item_repo = ItemRepository()
         self.current_ids = []
         self.current_item_ids = []
 
@@ -64,7 +68,28 @@ class OrdersTab(QWidget):
         self.order_table.setColumnCount(6)
         self.order_table.setHorizontalHeaderLabels(["Покупатель", "Дата", "Доставка", "Скидка", "Описание", "ID"])
         self.order_table.setColumnHidden(5, True)
+        self.order_table.setSortingEnabled(True)
         self.order_table.itemSelectionChanged.connect(self.on_order_selected)
+
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Поиск по покупателю или описанию")
+        self.search_btn = QPushButton("Найти")
+        self.search_btn.clicked.connect(self.search)
+
+        self.date_from = QDateEdit()
+        self.date_from.setCalendarPopup(True)
+        self.date_from.setDate(QDate(2020, 1, 1))
+        self.date_from.setDisplayFormat("yyyy-MM-dd")
+        self.date_from.dateChanged.connect(self.search)
+
+        self.date_to = QDateEdit()
+        self.date_to.setCalendarPopup(True)
+        self.date_to.setDate(QDate.currentDate())
+        self.date_to.setDisplayFormat("yyyy-MM-dd")
+        self.date_to.dateChanged.connect(self.search)
+
+        self.reset_dates_btn = QPushButton("Сброс")
+        self.reset_dates_btn.clicked.connect(self.reset_dates)
 
         order_buttons = QHBoxLayout()
         self.add_order_btn = QPushButton("+ Заказ")
@@ -83,6 +108,7 @@ class OrdersTab(QWidget):
         self.item_table.setColumnCount(4)
         self.item_table.setHorizontalHeaderLabels(["Товар", "Цена", "Количество", "ID"])
         self.item_table.setColumnHidden(3, True)
+        self.item_table.setSortingEnabled(True)
 
         item_buttons = QHBoxLayout()
         self.add_item_btn = QPushButton("+ Товар")
@@ -96,6 +122,17 @@ class OrdersTab(QWidget):
         top_widget = QWidget()
         top_layout = QVBoxLayout()
         top_layout.setContentsMargins(0, 0, 0, 0)
+
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(self.search_input)
+        filter_row.addWidget(self.search_btn)
+        filter_row.addWidget(QLabel("С:"))
+        filter_row.addWidget(self.date_from)
+        filter_row.addWidget(QLabel("По:"))
+        filter_row.addWidget(self.date_to)
+        filter_row.addWidget(self.reset_dates_btn)
+        top_layout.addLayout(filter_row)
+
         top_layout.addWidget(self.order_table)
         top_layout.addLayout(order_buttons)
         top_widget.setLayout(top_layout)
@@ -139,7 +176,16 @@ class OrdersTab(QWidget):
         return self.current_item_ids[row]
 
     def load_data(self):
-        rows = self.repo.get_all()
+        self.search()
+
+    def search(self):
+        text = self.search_input.text().strip()
+        start = self.date_from.date().toString("yyyy-MM-dd")
+        end = self.date_to.date().toString("yyyy-MM-dd")
+        if text:
+            rows = self.repo.search_combined(text, start, end)
+        else:
+            rows = self.repo.search_by_date_range(start, end)
         self.current_ids = [r["order_id"] for r in rows]
         self.order_table.setRowCount(len(rows))
         for i, row in enumerate(rows):
@@ -153,6 +199,10 @@ class OrdersTab(QWidget):
             self.order_table.setItem(i, 5, QTableWidgetItem(str(row["order_id"])))
         self.order_table.resizeColumnsToContents()
         self.load_items()
+
+    def reset_dates(self):
+        self.date_from.setDate(QDate(2020, 1, 1))
+        self.date_to.setDate(QDate.currentDate())
 
     def load_items(self):
         order_id = self.get_selected_order_id()
@@ -174,9 +224,9 @@ class OrdersTab(QWidget):
         self.load_items()
 
     def add_order(self):
-        customers = self.repo.get_all_customers()
+        customers = self.customer_repo.get_all()
         dialog = OrderDialog(self, customers=customers)
-        if dialog.exec_():
+        if dialog.exec():
             self.repo.create(dialog.get_data())
             self.load_data()
 
@@ -187,12 +237,12 @@ class OrdersTab(QWidget):
             return
         try:
             data = self.repo.get_by_id(order_id)
-            customers = self.repo.get_all_customers()
+            customers = self.customer_repo.get_all()
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
             return
         dialog = OrderDialog(self, data=data, customers=customers)
-        if dialog.exec_():
+        if dialog.exec():
             try:
                 self.repo.update(order_id, dialog.get_data())
                 self.load_data()
@@ -215,9 +265,9 @@ class OrdersTab(QWidget):
         if not order_id:
             QMessageBox.warning(self, "Ошибка", "Выберите заказ")
             return
-        items = self.repo.get_all_items()
+        items = self.item_repo.get_all()
         dialog = OrderItemDialog(self, items=items)
-        if dialog.exec_():
+        if dialog.exec():
             data = dialog.get_data()
             if data["item_id"] is None:
                 QMessageBox.warning(self, "Ошибка", "Выберите товар")
@@ -231,14 +281,14 @@ class OrdersTab(QWidget):
             QMessageBox.warning(self, "Ошибка", "Выберите позицию")
             return
         order_id = self.get_selected_order_id()
-        items = self.repo.get_all_items()
+        items = self.item_repo.get_all()
         data = {"item_id": None, "amount": 0}
         for r in self.repo.get_items(order_id):
             if r["position_id"] == position_id:
                 data = r
                 break
         dialog = OrderItemDialog(self, items=items, data=data)
-        if dialog.exec_():
+        if dialog.exec():
             d = dialog.get_data()
             self.repo.update_item(position_id, d["amount"])
             self.load_items()

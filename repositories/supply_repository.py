@@ -24,7 +24,13 @@ class SupplyRepository:
                     (data["supplier_id"], data["warehouse_id"], data["supply_date"], supply_id))
 
     def delete(self, supply_id):
-        db.execute("DELETE FROM supplies WHERE supply_id = %s", (supply_id,))
+        items = self.get_items(supply_id)
+        ops = []
+        for it in items:
+            ops.append(("UPDATE items SET stock_quantity = stock_quantity - %s WHERE item_id = %s",
+                        (it["quantity"], it["item_id"]), False))
+        ops.append(("DELETE FROM supplies WHERE supply_id = %s", (supply_id,), False))
+        db.execute_many(ops)
 
     def get_items(self, supply_id):
         query = """
@@ -58,14 +64,31 @@ class SupplyRepository:
         return db.fetch_one(query, (supply_id,))
 
     def add_item(self, supply_id, item_id, quantity):
-        query = "INSERT INTO supplyitems (supply_id, item_id, quantity) VALUES (%s, %s, %s) RETURNING income_id"
-        return db.execute(query, (supply_id, item_id, quantity), returning=True)
+        return db.execute_many([
+            ("INSERT INTO supplyitems (supply_id, item_id, quantity) VALUES (%s, %s, %s) RETURNING income_id",
+             (supply_id, item_id, quantity), True),
+            ("UPDATE items SET stock_quantity = stock_quantity + %s WHERE item_id = %s",
+             (quantity, item_id), False),
+        ])
 
     def update_item(self, income_id, quantity):
-        db.execute("UPDATE supplyitems SET quantity = %s WHERE income_id = %s", (quantity, income_id))
+        old = db.fetch_one("SELECT item_id, quantity FROM supplyitems WHERE income_id = %s", (income_id,))
+        if old:
+            delta = quantity - old["quantity"]
+            db.execute_many([
+                ("UPDATE supplyitems SET quantity = %s WHERE income_id = %s", (quantity, income_id), False),
+                ("UPDATE items SET stock_quantity = stock_quantity + %s WHERE item_id = %s",
+                 (delta, old["item_id"]), False),
+            ])
 
     def delete_item(self, income_id):
-        db.execute("DELETE FROM supplyitems WHERE income_id = %s", (income_id,))
+        old = db.fetch_one("SELECT item_id, quantity FROM supplyitems WHERE income_id = %s", (income_id,))
+        if old:
+            db.execute_many([
+                ("DELETE FROM supplyitems WHERE income_id = %s", (income_id,), False),
+                ("UPDATE items SET stock_quantity = stock_quantity - %s WHERE item_id = %s",
+                 (old["quantity"], old["item_id"]), False),
+            ])
 
     def get_all_suppliers(self):
         return db.fetch_all("SELECT * FROM suppliers ORDER BY supplier_name")
@@ -75,3 +98,39 @@ class SupplyRepository:
 
     def get_all_items(self):
         return db.fetch_all("SELECT * FROM items ORDER BY item_name")
+
+    def search(self, text):
+        query = """
+        SELECT s.*, sup.supplier_name, w.warehouse_address
+        FROM supplies s
+        LEFT JOIN suppliers sup ON s.supplier_id = sup.supplier_id
+        LEFT JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+        WHERE sup.supplier_name ILIKE %s OR w.warehouse_address ILIKE %s
+        ORDER BY s.supply_id
+        """
+        pattern = f"%{text}%"
+        return db.fetch_all(query, (pattern, pattern))
+
+    def search_by_date_range(self, start_date, end_date):
+        query = """
+        SELECT s.*, sup.supplier_name, w.warehouse_address
+        FROM supplies s
+        LEFT JOIN suppliers sup ON s.supplier_id = sup.supplier_id
+        LEFT JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+        WHERE s.supply_date >= %s AND s.supply_date <= %s
+        ORDER BY s.supply_id
+        """
+        return db.fetch_all(query, (start_date, end_date))
+
+    def search_combined(self, text, start_date, end_date):
+        query = """
+        SELECT s.*, sup.supplier_name, w.warehouse_address
+        FROM supplies s
+        LEFT JOIN suppliers sup ON s.supplier_id = sup.supplier_id
+        LEFT JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+        WHERE (sup.supplier_name ILIKE %s OR w.warehouse_address ILIKE %s)
+          AND s.supply_date >= %s AND s.supply_date <= %s
+        ORDER BY s.supply_id
+        """
+        pattern = f"%{text}%"
+        return db.fetch_all(query, (pattern, pattern, start_date, end_date))

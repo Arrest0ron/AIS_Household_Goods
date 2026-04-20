@@ -4,7 +4,7 @@ from db import db
 class AuthRepository:
     def get_user_by_login(self, login):
         query = """
-        SELECT user_id, login, password_hash, role, is_active
+        SELECT user_id, login, password_hash, role, is_active, customer_id
         FROM users
         WHERE login = %s
         """

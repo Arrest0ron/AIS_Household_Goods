@@ -1,9 +1,9 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QPushButton, QLineEdit,
     QTableWidget, QTableWidgetItem, QMessageBox, QDialog, QFormLayout,
-    QComboBox, QSpinBox, QFileDialog
+    QComboBox, QSpinBox, QFileDialog, QDateEdit, QLabel
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QDate
 from repositories.supply_repository import SupplyRepository
 from ui.dialogs import SupplyDialog
 from services.pdf_reports import ReportService
@@ -64,7 +64,28 @@ class SuppliesTab(QWidget):
         self.supply_table.setColumnCount(4)
         self.supply_table.setHorizontalHeaderLabels(["Поставщик", "Склад", "Дата", "ID"])
         self.supply_table.setColumnHidden(3, True)
+        self.supply_table.setSortingEnabled(True)
         self.supply_table.itemSelectionChanged.connect(self.on_supply_selected)
+
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Поиск по поставщику или складу")
+        self.search_btn = QPushButton("Найти")
+        self.search_btn.clicked.connect(self.search)
+
+        self.date_from = QDateEdit()
+        self.date_from.setCalendarPopup(True)
+        self.date_from.setDate(QDate(2020, 1, 1))
+        self.date_from.setDisplayFormat("yyyy-MM-dd")
+        self.date_from.dateChanged.connect(self.search)
+
+        self.date_to = QDateEdit()
+        self.date_to.setCalendarPopup(True)
+        self.date_to.setDate(QDate.currentDate())
+        self.date_to.setDisplayFormat("yyyy-MM-dd")
+        self.date_to.dateChanged.connect(self.search)
+
+        self.reset_dates_btn = QPushButton("Сброс")
+        self.reset_dates_btn.clicked.connect(self.reset_dates)
 
         supply_buttons = QHBoxLayout()
         self.add_supply_btn = QPushButton("+ Поставка")
@@ -83,6 +104,7 @@ class SuppliesTab(QWidget):
         self.item_table.setColumnCount(3)
         self.item_table.setHorizontalHeaderLabels(["Товар", "Количество", "ID"])
         self.item_table.setColumnHidden(2, True)
+        self.item_table.setSortingEnabled(True)
 
         item_buttons = QHBoxLayout()
         self.add_item_btn = QPushButton("+ Товар")
@@ -96,6 +118,17 @@ class SuppliesTab(QWidget):
         top_widget = QWidget()
         top_layout = QVBoxLayout()
         top_layout.setContentsMargins(0, 0, 0, 0)
+
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(self.search_input)
+        filter_row.addWidget(self.search_btn)
+        filter_row.addWidget(QLabel("С:"))
+        filter_row.addWidget(self.date_from)
+        filter_row.addWidget(QLabel("По:"))
+        filter_row.addWidget(self.date_to)
+        filter_row.addWidget(self.reset_dates_btn)
+        top_layout.addLayout(filter_row)
+
         top_layout.addWidget(self.supply_table)
         top_layout.addLayout(supply_buttons)
         top_widget.setLayout(top_layout)
@@ -139,7 +172,16 @@ class SuppliesTab(QWidget):
         return self.current_item_ids[row]
 
     def load_data(self):
-        rows = self.repo.get_all()
+        self.search()
+
+    def search(self):
+        text = self.search_input.text().strip()
+        start = self.date_from.date().toString("yyyy-MM-dd")
+        end = self.date_to.date().toString("yyyy-MM-dd")
+        if text:
+            rows = self.repo.search_combined(text, start, end)
+        else:
+            rows = self.repo.search_by_date_range(start, end)
         self.current_ids = [r["supply_id"] for r in rows]
         self.supply_table.setRowCount(len(rows))
         for i, row in enumerate(rows):
@@ -150,6 +192,10 @@ class SuppliesTab(QWidget):
             self.supply_table.setItem(i, 3, QTableWidgetItem(str(row["supply_id"])))
         self.supply_table.resizeColumnsToContents()
         self.load_items()
+
+    def reset_dates(self):
+        self.date_from.setDate(QDate(2020, 1, 1))
+        self.date_to.setDate(QDate.currentDate())
 
     def load_items(self):
         supply_id = self.get_selected_supply_id()
@@ -173,7 +219,7 @@ class SuppliesTab(QWidget):
         suppliers = self.repo.get_all_suppliers()
         warehouses = self.repo.get_all_warehouses()
         dialog = SupplyDialog(self, suppliers=suppliers, warehouses=warehouses)
-        if dialog.exec_():
+        if dialog.exec():
             self.repo.create(dialog.get_data())
             self.load_data()
 
@@ -190,7 +236,7 @@ class SuppliesTab(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
             return
         dialog = SupplyDialog(self, data=data, suppliers=suppliers, warehouses=warehouses)
-        if dialog.exec_():
+        if dialog.exec():
             try:
                 self.repo.update(supply_id, dialog.get_data())
                 self.load_data()
@@ -215,7 +261,7 @@ class SuppliesTab(QWidget):
             return
         items = self.repo.get_all_items()
         dialog = SupplyItemDialog(self, items=items)
-        if dialog.exec_():
+        if dialog.exec():
             data = dialog.get_data()
             if data["item_id"] is None:
                 QMessageBox.warning(self, "Ошибка", "Выберите товар")
@@ -236,7 +282,7 @@ class SuppliesTab(QWidget):
                 data = r
                 break
         dialog = SupplyItemDialog(self, items=items, data=data)
-        if dialog.exec_():
+        if dialog.exec():
             d = dialog.get_data()
             self.repo.update_item(income_id, d["quantity"])
             self.load_items()

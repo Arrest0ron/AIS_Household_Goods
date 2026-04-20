@@ -1,3 +1,4 @@
+import logging
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTabWidget, QLabel
 )
@@ -11,6 +12,9 @@ from ui.customers_tab import CustomersTab
 from ui.supplies_tab import SuppliesTab
 from ui.orders_tab import OrdersTab
 from ui.reports_tab import ReportsTab
+from ui.charts_tab import ChartsTab
+
+log = logging.getLogger("ui.admin")
 
 
 class AdminMainWindow(QMainWindow):
@@ -32,7 +36,7 @@ class AdminMainWindow(QMainWindow):
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(16, 8, 16, 8)
 
-        app_title = QLabel("AIS_Shop")
+        app_title = QLabel("АИС Магазина бытовых товаров")
         app_title.setStyleSheet("color: #FFFFFF; font-size: 16pt; font-weight: 700; background: transparent;")
 
         role_badge = QLabel("Администратор")
@@ -69,14 +73,25 @@ class AdminMainWindow(QMainWindow):
 
         # Tabs
         self.tabs = QTabWidget()
-        self.tabs.addTab(CategoriesTab(), "Категории")
-        self.tabs.addTab(WarehousesTab(), "Склады")
-        self.tabs.addTab(SuppliersTab(), "Поставщики")
-        self.tabs.addTab(ItemsTab(), "Товары")
-        self.tabs.addTab(CustomersTab(), "Покупатели")
-        self.tabs.addTab(SuppliesTab(), "Поставки")
-        self.tabs.addTab(OrdersTab(), "Заказы")
-        self.tabs.addTab(ReportsTab(), "Отчёты")
+        tab_classes = [
+            ("Категории", CategoriesTab),
+            ("Склады", WarehousesTab),
+            ("Поставщики", SuppliersTab),
+            ("Товары", ItemsTab),
+            ("Покупатели", CustomersTab),
+            ("Поставки", SuppliesTab),
+            ("Заказы", OrdersTab),
+            ("Отчёты", ReportsTab),
+            ("Аналитика", ChartsTab),
+        ]
+        for name, cls in tab_classes:
+            try:
+                log.info("Инициализация вкладки: %s", name)
+                self.tabs.addTab(cls(), name)
+            except Exception:
+                log.exception("Ошибка при создании вкладки '%s'", name)
+                from PyQt6.QtWidgets import QWidget as W
+                self.tabs.addTab(W(), name)
 
         central = QWidget()
         layout = QVBoxLayout()

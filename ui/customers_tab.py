@@ -25,6 +25,7 @@ class CustomersTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["Имя", "Телефон", "Email", "Дата регистрации"])
+        self.table.setSortingEnabled(True)
 
         top = QHBoxLayout()
         top.addWidget(self.search_input)
@@ -74,7 +75,7 @@ class CustomersTab(QWidget):
 
     def add(self):
         dialog = CustomerDialog(self)
-        if dialog.exec_():
+        if dialog.exec():
             self.repo.create(dialog.get_data())
             self.load_data()
 
@@ -89,7 +90,7 @@ class CustomersTab(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
             return
         dialog = CustomerDialog(self, data=data)
-        if dialog.exec_():
+        if dialog.exec():
             try:
                 self.repo.update(customer_id, dialog.get_data())
                 self.load_data()

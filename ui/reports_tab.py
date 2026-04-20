@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QTextEdit, QGroupBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QGroupBox,
     QLabel, QFileDialog, QMessageBox
 )
 from PyQt6.QtGui import QTextDocument, QPageSize
@@ -34,27 +34,21 @@ class ReportsTab(QWidget):
         btn_pdf = QPushButton("Экспорт PDF")
         btn_pdf.clicked.connect(self.export_pdf)
 
-        preview_actions = [
-            ("Товары", self.preview_items),
-            ("Категории", self.preview_categories),
-            ("Поставщики", self.preview_suppliers),
-            ("Поставки", self.preview_supplies),
-            ("Покупатели", self.preview_customers),
-            ("Заказы", self.preview_orders),
-            ("Запасы", self.preview_stock),
-            ("Малые остатки", self.preview_low_stock),
-        ]
+        btn_stock = QPushButton("Запасы")
+        btn_stock.setStyleSheet(style)
+        btn_stock.clicked.connect(self.preview_stock)
 
-        preview_group = QGroupBox("Просмотр")
+        btn_low_stock = QPushButton("Малые остатки")
+        btn_low_stock.setStyleSheet(style)
+        btn_low_stock.clicked.connect(self.preview_low_stock)
+
+        preview_group = QGroupBox("Отчёты")
         preview_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        grid = QGridLayout()
-        cols = 4
-        for i, (label, method) in enumerate(preview_actions):
-            b = QPushButton(label)
-            b.setStyleSheet(style)
-            b.clicked.connect(method)
-            grid.addWidget(b, i // cols, i % cols)
-        preview_group.setLayout(grid)
+        preview_layout = QHBoxLayout()
+        preview_layout.addWidget(btn_stock)
+        preview_layout.addWidget(btn_low_stock)
+        preview_layout.addStretch()
+        preview_group.setLayout(preview_layout)
 
         layout = QVBoxLayout()
         layout.addWidget(make_group("Сводка", [btn_summary, btn_pdf]))
@@ -84,87 +78,30 @@ class ReportsTab(QWidget):
         """
         self.set_html(html)
 
-    def _items_html(self):
-        rows = self.repo.get_all_items()
-        html = "<h2>Товары</h2><table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"
-        html += "<tr><th>№</th><th>Название</th><th>Категория</th><th>Цена (₽)</th><th>Остаток</th><th>Масса (кг)</th></tr>"
+    def preview_stock(self):
+        rows = sorted(self.repo.get_all_items(), key=lambda r: r["stock_quantity"])
+        html = "<h2>Складские запасы</h2><table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"
+        html += "<tr><th>№</th><th>Название</th><th>Категория</th><th>Цена (₽)</th><th>Остаток</th><th>Стоимость (₽)</th></tr>"
         for i, r in enumerate(rows, 1):
+            price = float(r['price'])
+            qty = r['stock_quantity']
             html += f"<tr><td>{i}</td><td>{r['item_name']}</td><td>{r.get('category_name') or '—'}</td>"
-            html += f"<td>{float(r['price']):.2f}</td><td>{r['stock_quantity']}</td>"
-            html += f"<td>{float(r['mass']):.2f}</td></tr>" if r.get('mass') else "<td>—</td></tr>"
+            html += f"<td>{price:.2f}</td><td>{qty}</td><td>{price * qty:.2f}</td></tr>"
         html += "</table>"
-        return html
+        self.set_html(html)
 
-    def _categories_html(self):
-        rows = self.repo.get_category_summary()
-        html = "<h2>Категории</h2><table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"
-        html += "<tr><th>№</th><th>Категория</th><th>Товаров</th><th>Остаток</th><th>Стоимость (₽)</th></tr>"
-        for i, r in enumerate(rows, 1):
-            html += f"<tr><td>{i}</td><td>{r['category_name']}</td><td>{r['item_count']}</td>"
-            html += f"<td>{r['total_stock']}</td><td>{float(r['total_value']):.2f}</td></tr>"
-        html += "</table>"
-        return html
-
-    def _suppliers_html(self):
-        rows = self.repo.get_all_suppliers()
-        html = "<h2>Поставщики</h2><table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"
-        html += "<tr><th>№</th><th>Название</th><th>Контакты</th></tr>"
-        for i, r in enumerate(rows, 1):
-            html += f"<tr><td>{i}</td><td>{r['supplier_name']}</td><td>{r.get('contact_info') or '—'}</td></tr>"
-        html += "</table>"
-        return html
-
-    def _supplies_html(self):
-        rows = self.repo.get_supply_summary()
-        html = "<h2>Поставки</h2><table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"
-        html += "<tr><th>№</th><th>Поставщик</th><th>Склад</th><th>Дата</th><th>Позиций</th><th>Кол-во</th></tr>"
-        for i, r in enumerate(rows, 1):
-            html += f"<tr><td>{i}</td><td>{r.get('supplier_name') or '—'}</td><td>{r.get('warehouse_address') or '—'}</td>"
-            html += f"<td>{r['supply_date']}</td><td>{r['item_count']}</td><td>{r['total_items']}</td></tr>"
-        html += "</table>"
-        return html
-
-    def _customers_html(self):
-        rows = self.repo.get_all_customers()
-        html = "<h2>Покупатели</h2><table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"
-        html += "<tr><th>№</th><th>Имя</th><th>Телефон</th><th>Email</th><th>Дата регистрации</th></tr>"
-        for i, r in enumerate(rows, 1):
-            html += f"<tr><td>{i}</td><td>{r['customer_name']}</td><td>{r.get('phone') or '—'}</td>"
-            html += f"<td>{r.get('email') or '—'}</td><td>{r.get('registration_date') or '—'}</td></tr>"
-        html += "</table>"
-        return html
-
-    def _orders_html(self):
-        rows = self.repo.get_order_summary()
-        html = "<h2>Заказы</h2><table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"
-        html += "<tr><th>№</th><th>Покупатель</th><th>Дата</th><th>Скидка</th><th>Сумма (₽)</th></tr>"
-        for r in rows:
-            html += f"<tr><td>{r['order_id']}</td><td>{r.get('customer_name') or '—'}</td>"
-            html += f"<td>{r['order_date']}</td><td>{float(r['discount']):.2f}%</td>"
-            html += f"<td>{float(r['total']):.2f}</td></tr>"
-        html += "</table>"
-        return html
-
-    def _low_stock_html(self):
+    def preview_low_stock(self):
         rows = self.repo.get_low_stock_items(10)
         if not rows:
-            return "<h2>Малые остатки</h2><p>Нет товаров с остатком <= 10</p>"
+            self.set_html("<h2>Малые остатки</h2><p>Нет товаров с остатком <= 10</p>")
+            return
         html = "<h2>Малые остатки (<= 10)</h2><table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>"
         html += "<tr><th>№</th><th>Товар</th><th>Категория</th><th>Остаток</th><th>Цена (₽)</th></tr>"
         for i, r in enumerate(rows, 1):
             html += f"<tr><td>{i}</td><td>{r['item_name']}</td><td>{r.get('category_name') or '—'}</td>"
             html += f"<td>{r['stock_quantity']}</td><td>{float(r['price']):.2f}</td></tr>"
         html += "</table>"
-        return html
-
-    def preview_items(self): self.set_html(self._items_html())
-    def preview_categories(self): self.set_html(self._categories_html())
-    def preview_suppliers(self): self.set_html(self._suppliers_html())
-    def preview_supplies(self): self.set_html(self._supplies_html())
-    def preview_customers(self): self.set_html(self._customers_html())
-    def preview_orders(self): self.set_html(self._orders_html())
-    def preview_stock(self): self.set_html(self._items_html())
-    def preview_low_stock(self): self.set_html(self._low_stock_html())
+        self.set_html(html)
 
     def export_pdf(self):
         path, _ = QFileDialog.getSaveFileName(self, "Экспорт PDF", "Отчёт.pdf", "PDF Files (*.pdf)")

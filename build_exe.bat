@@ -7,6 +7,9 @@ pyinstaller --onefile --windowed ^
     --icon resources\app.ico ^
     --add-data "resources;resources" ^
     --hidden-import psycopg2 ^
+    --hidden-import matplotlib ^
+    --hidden-import matplotlib.backends.backend_qtagg ^
+    --collect-submodules matplotlib ^
     main.py
 
 echo.
