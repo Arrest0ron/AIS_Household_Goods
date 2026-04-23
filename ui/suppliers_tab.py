@@ -80,11 +80,18 @@ class SuppliersTab(QWidget):
         if not supplier_id:
             QMessageBox.warning(self, "Ошибка", "Выберите поставщика")
             return
-        data = self.repo.get_by_id(supplier_id)
+        try:
+            data = self.repo.get_by_id(supplier_id)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
+            return
         dialog = SupplierDialog(self, data=data)
         if dialog.exec_():
-            self.repo.update(supplier_id, dialog.get_data())
-            self.load_data()
+            try:
+                self.repo.update(supplier_id, dialog.get_data())
+                self.load_data()
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}")
 
     def delete(self):
         supplier_id = self.get_selected_id()

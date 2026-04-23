@@ -85,12 +85,19 @@ class ItemsTab(QWidget):
         if not item_id:
             QMessageBox.warning(self, "Ошибка", "Выберите товар")
             return
-        data = self.repo.get_by_id(item_id)
-        cats = self.repo.get_categories()
+        try:
+            data = self.repo.get_by_id(item_id)
+            cats = self.repo.get_categories()
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
+            return
         dialog = ItemDialog(self, data=data, categories=cats)
         if dialog.exec_():
-            self.repo.update(item_id, dialog.get_data())
-            self.load_data()
+            try:
+                self.repo.update(item_id, dialog.get_data())
+                self.load_data()
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}")
 
     def delete(self):
         item_id = self.get_selected_id()

@@ -1,6 +1,6 @@
 PURPLE_STYLESHEET = """
 /* === Global === */
-QMainWindow, QWidget {
+QMainWindow, QDialog {
     background-color: #F8F4FF;
     color: #2D1B69;
     font-family: 'Segoe UI', 'Arial', sans-serif;

@@ -182,12 +182,19 @@ class OrdersTab(QWidget):
         if not order_id:
             QMessageBox.warning(self, "Ошибка", "Выберите заказ")
             return
-        data = self.repo.get_by_id(order_id)
-        customers = self.repo.get_all_customers()
+        try:
+            data = self.repo.get_by_id(order_id)
+            customers = self.repo.get_all_customers()
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
+            return
         dialog = OrderDialog(self, data=data, customers=customers)
         if dialog.exec_():
-            self.repo.update(order_id, dialog.get_data())
-            self.load_data()
+            try:
+                self.repo.update(order_id, dialog.get_data())
+                self.load_data()
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}")
 
     def delete_order(self):
         order_id = self.get_selected_order_id()

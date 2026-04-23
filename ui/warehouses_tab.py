@@ -81,11 +81,18 @@ class WarehousesTab(QWidget):
         if not warehouse_id:
             QMessageBox.warning(self, "Ошибка", "Выберите склад")
             return
-        data = self.repo.get_by_id(warehouse_id)
+        try:
+            data = self.repo.get_by_id(warehouse_id)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
+            return
         dialog = WarehouseDialog(self, data=data)
         if dialog.exec_():
-            self.repo.update(warehouse_id, dialog.get_data())
-            self.load_data()
+            try:
+                self.repo.update(warehouse_id, dialog.get_data())
+                self.load_data()
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}")
 
     def delete(self):
         warehouse_id = self.get_selected_id()

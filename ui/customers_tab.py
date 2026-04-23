@@ -83,11 +83,18 @@ class CustomersTab(QWidget):
         if not customer_id:
             QMessageBox.warning(self, "Ошибка", "Выберите покупателя")
             return
-        data = self.repo.get_by_id(customer_id)
+        try:
+            data = self.repo.get_by_id(customer_id)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
+            return
         dialog = CustomerDialog(self, data=data)
         if dialog.exec_():
-            self.repo.update(customer_id, dialog.get_data())
-            self.load_data()
+            try:
+                self.repo.update(customer_id, dialog.get_data())
+                self.load_data()
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}")
 
     def delete(self):
         customer_id = self.get_selected_id()

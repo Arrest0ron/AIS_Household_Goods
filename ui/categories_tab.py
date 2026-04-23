@@ -88,16 +88,23 @@ class CategoriesTab(QWidget):
         if not category_id:
             QMessageBox.warning(self, "Ошибка", "Выберите категорию")
             return
-        data = self.repo.get_by_id(category_id)
+        try:
+            data = self.repo.get_by_id(category_id)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
+            return
         dialog = CategoryDialog(self, data=data)
         if dialog.exec_():
             data = dialog.get_data()
             if not data["category_name"]:
                 QMessageBox.warning(self, "Ошибка", "Введите название категории")
                 return
-            self.repo.update(category_id, data)
-            QMessageBox.information(self, "Успех", "Категория обновлена")
-            self.load_data()
+            try:
+                self.repo.update(category_id, data)
+                QMessageBox.information(self, "Успех", "Категория обновлена")
+                self.load_data()
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}")
 
     def delete(self):
         category_id = self.get_selected_id()

@@ -179,13 +179,20 @@ class SuppliesTab(QWidget):
         if not supply_id:
             QMessageBox.warning(self, "Ошибка", "Выберите поставку")
             return
-        data = self.repo.get_by_id(supply_id)
-        suppliers = self.repo.get_all_suppliers()
-        warehouses = self.repo.get_all_warehouses()
+        try:
+            data = self.repo.get_by_id(supply_id)
+            suppliers = self.repo.get_all_suppliers()
+            warehouses = self.repo.get_all_warehouses()
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные:\n{e}")
+            return
         dialog = SupplyDialog(self, data=data, suppliers=suppliers, warehouses=warehouses)
         if dialog.exec_():
-            self.repo.update(supply_id, dialog.get_data())
-            self.load_data()
+            try:
+                self.repo.update(supply_id, dialog.get_data())
+                self.load_data()
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}")
 
     def delete_supply(self):
         supply_id = self.get_selected_supply_id()
