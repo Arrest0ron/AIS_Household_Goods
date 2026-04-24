@@ -1,6 +1,5 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit,
-    QPushButton, QMessageBox, QLabel, QFrame
+    QWidget, QVBoxLayout, QLineEdit, QPushButton, QMessageBox, QLabel, QFrame
 )
 from PyQt6.QtCore import Qt
 from services.auth_service import AuthService
@@ -14,8 +13,8 @@ class LoginWindow(QWidget):
         super().__init__()
         self.auth_service = AuthService()
         self.setWindowTitle("AIS_Shop — Вход в систему")
-        self.resize(480, 360)
-        self.setMinimumSize(480, 360)
+        self.resize(520, 440)
+        self.setMinimumSize(520, 440)
 
         # Background
         self.setStyleSheet("""
@@ -43,7 +42,7 @@ class LoginWindow(QWidget):
         icon_label.setStyleSheet("font-size: 36px;")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        title = QLabel("Информационная система\nмагазина")
+        title = QLabel("АИС Магазина бытовых товаров")
         title.setStyleSheet("font-size: 18pt; font-weight: 700; color: #4A2D8A;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 

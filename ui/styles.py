@@ -97,9 +97,15 @@ QTableWidget {
 QTableWidget::item {
     padding: 6px 10px;
     border-bottom: 1px solid #F3EEFF;
+    color: #2D1B69;
 }
 QTableWidget::item:selected {
     background: #C4B5FD;
+    color: #2D1B69;
+}
+
+/* === QHeaderView (horizontal + vertical) === */
+QHeaderView {
     color: #2D1B69;
 }
 QHeaderView::section {
@@ -109,6 +115,14 @@ QHeaderView::section {
     border: none;
     border-bottom: 2px solid #D8CCF0;
     font-weight: 700;
+}
+QHeaderView::section:vertical {
+    color: #2D1B69;
+    background: #F3EEFF;
+    border-right: 2px solid #D8CCF0;
+    border-bottom: 1px solid #EDE4FF;
+    padding: 6px 12px;
+    font-weight: 600;
 }
 
 /* === QComboBox === */
