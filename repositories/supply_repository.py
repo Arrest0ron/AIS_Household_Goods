@@ -36,6 +36,27 @@ class SupplyRepository:
         """
         return db.fetch_all(query, (supply_id,))
 
+    def get_items_with_prices(self, supply_id):
+        query = """
+        SELECT si.*, i.item_name, i.price
+        FROM supplyitems si
+        LEFT JOIN items i ON si.item_id = i.item_id
+        WHERE si.supply_id = %s
+        ORDER BY si.income_id
+        """
+        return db.fetch_all(query, (supply_id,))
+
+    def get_supply_detail(self, supply_id):
+        query = """
+        SELECT s.*, sup.supplier_name, sup.contact_info,
+               w.warehouse_address
+        FROM supplies s
+        LEFT JOIN suppliers sup ON s.supplier_id = sup.supplier_id
+        LEFT JOIN warehouses w ON s.warehouse_id = w.warehouse_id
+        WHERE s.supply_id = %s
+        """
+        return db.fetch_one(query, (supply_id,))
+
     def add_item(self, supply_id, item_id, quantity):
         query = "INSERT INTO supplyitems (supply_id, item_id, quantity) VALUES (%s, %s, %s) RETURNING income_id"
         return db.execute(query, (supply_id, item_id, quantity), returning=True)

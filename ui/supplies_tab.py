@@ -71,10 +71,12 @@ class SuppliesTab(QWidget):
         self.edit_supply_btn = QPushButton("Изменить")
         self.delete_supply_btn = QPushButton("Удалить")
         self.pdf_supply_btn = QPushButton("PDF")
+        self.contract_btn = QPushButton("Договор")
         supply_buttons.addWidget(self.add_supply_btn)
         supply_buttons.addWidget(self.edit_supply_btn)
         supply_buttons.addWidget(self.delete_supply_btn)
         supply_buttons.addStretch()
+        supply_buttons.addWidget(self.contract_btn)
         supply_buttons.addWidget(self.pdf_supply_btn)
 
         self.item_table = QTableWidget()
@@ -117,6 +119,7 @@ class SuppliesTab(QWidget):
         self.edit_supply_btn.clicked.connect(self.edit_supply)
         self.delete_supply_btn.clicked.connect(self.delete_supply)
         self.pdf_supply_btn.clicked.connect(self.export_pdf)
+        self.contract_btn.clicked.connect(self.export_contract)
         self.add_item_btn.clicked.connect(self.add_item)
         self.edit_item_btn.clicked.connect(self.edit_item)
         self.delete_item_btn.clicked.connect(self.delete_item)
@@ -258,3 +261,19 @@ class SuppliesTab(QWidget):
             import os; os.startfile(path)
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить PDF:\n{e}")
+
+    def export_contract(self):
+        supply_id = self.get_selected_supply_id()
+        if not supply_id:
+            QMessageBox.warning(self, "Ошибка", "Выберите поставку")
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Договор поставки", f"Договор_поставки_{supply_id}.pdf",
+            "PDF Files (*.pdf)")
+        if not path:
+            return
+        try:
+            ReportService().supply_contract(path, supply_id)
+            import os; os.startfile(path)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать договор:\n{e}")
