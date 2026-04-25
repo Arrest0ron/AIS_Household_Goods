@@ -10,6 +10,7 @@ from reportlab.platypus import (
 from reportlab.platypus.frames import Frame
 from reportlab.platypus.doctemplate import PageTemplate
 from repositories.report_repository import ReportRepository
+from repositories.supply_repository import SupplyRepository
 from datetime import datetime
 
 
@@ -204,3 +205,122 @@ class ReportService:
         ] for i, r in enumerate(rows)]
         pdf.add_table(headers, data, col_widths=[20, 120, 80, 50, 60])
         pdf.build(filepath)
+
+    def supply_contract(self, filepath, supply_id):
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import Paragraph, Spacer, Table
+        from reportlab.lib.units import mm
+
+        supply_repo = SupplyRepository()
+        supply = supply_repo.get_supply_detail(supply_id)
+        if not supply:
+            raise ValueError(f"Поставка #{supply_id} не найдена")
+
+        items = supply_repo.get_items_with_prices(supply_id)
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle("ContractTitle",
+            fontSize=16, spaceAfter=4, alignment=TA_CENTER,
+            fontName="Helvetica-Bold")
+        subtitle_style = ParagraphStyle("ContractSub",
+            fontSize=10, alignment=TA_CENTER, spaceAfter=20)
+        normal = ParagraphStyle("ContractNormal",
+            fontSize=10, leading=14, spaceAfter=4)
+        bold_style = ParagraphStyle("ContractBold", parent=normal,
+            fontName="Helvetica-Bold", spaceAfter=10)
+        sig_style = ParagraphStyle("Signature",
+            fontSize=10, leading=14, spaceBefore=30)
+        hdr_style = ParagraphStyle("H", fontSize=9,
+            fontName="Helvetica-Bold", alignment=TA_CENTER)
+        cell_style = ParagraphStyle("Cell", fontSize=9)
+        cell_center = ParagraphStyle("CellCenter", parent=cell_style,
+            alignment=TA_CENTER)
+
+        elements = []
+
+        elements.append(Paragraph("ДОГОВОР ПОСТАВКИ", title_style))
+        elements.append(Paragraph(f"№ {supply_id}  от  {supply['supply_date']}", subtitle_style))
+        elements.append(Paragraph("г. Москва", subtitle_style))
+        elements.append(Spacer(1, 6*mm))
+
+        elements.append(Paragraph(
+            f'<b>Поставщик:</b> {supply["supplier_name"]}', normal))
+        if supply.get("contact_info"):
+            elements.append(Paragraph(
+                f'<b>Контактные данные:</b> {supply["contact_info"]}', normal))
+        elements.append(Paragraph(
+            f'<b>Склад отгрузки:</b> {supply["warehouse_address"]}', normal))
+        elements.append(Spacer(1, 4*mm))
+
+        elements.append(Paragraph(
+            "Настоящий Договор составлен о том, что Поставщик обязуется "
+            "передать, а Покупатель — принять и оплатить следующий товар:",
+            normal))
+        elements.append(Spacer(1, 4*mm))
+
+        headers = ["№", "Наименование", "Кол-во", "Цена (₽)", "Сумма (₽)"]
+        data = [[Paragraph(h, hdr_style) for h in headers]]
+
+        total = 0
+        for i, item in enumerate(items):
+            qty = item["quantity"]
+            price = float(item["price"]) if item.get("price") else 0
+            amount = qty * price
+            total += amount
+            data.append([
+                Paragraph(str(i + 1), cell_center),
+                Paragraph(item["item_name"], cell_style),
+                Paragraph(str(qty), cell_center),
+                Paragraph(f"{price:.2f}", cell_center),
+                Paragraph(f"{amount:.2f}", cell_center),
+            ])
+
+        total_bold_center = ParagraphStyle("TotalBoldCenter",
+            fontSize=9, fontName="Helvetica-Bold", alignment=TA_CENTER)
+        data.append([
+            Paragraph("", cell_center),
+            Paragraph("<b>ИТОГО:</b>", total_bold_center),
+            Paragraph("", cell_center),
+            Paragraph("", cell_center),
+            Paragraph(f"<b>{total:.2f}</b>", total_bold_center),
+        ])
+
+        t = Table(data, colWidths=[20, 170, 50, 60, 60], repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2F5496")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -2), 0.5, colors.HexColor("#D9D9D9")),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E8E0F7")),
+            ("GRID", (0, -1), (-1, -1), 0.5, colors.HexColor("#2F5496")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 10*mm))
+
+        elements.append(Paragraph(
+            f"<b>Общая сумма Договора:</b> {total:,.2f} руб.",
+            bold_style))
+        elements.append(Spacer(1, 10*mm))
+
+        sig_table = Table([
+            [Paragraph("Поставщик:", sig_style),
+             Paragraph("Покупатель:", sig_style)],
+            [Paragraph("_____________ /______________/", sig_style),
+             Paragraph("_____________ /______________/", sig_style)],
+            [Paragraph("М.П.", sig_style),
+             Paragraph("М.П.", sig_style)],
+        ], colWidths=[90*mm, 90*mm])
+        sig_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+        elements.append(sig_table)
+
+        doc = SimpleDocTemplate(filepath, pagesize=A4,
+            topMargin=20*mm, bottomMargin=20*mm,
+            leftMargin=20*mm, rightMargin=20*mm)
+        template = PageTemplate(
+            onPage=lambda c, d: None,
+            frames=[Frame(20*mm, 20*mm, A4[0] - 40*mm,
+                          A4[1] - 40*mm, id="normal")])
+        doc.addPageTemplates([template])
+        doc.build(elements)
