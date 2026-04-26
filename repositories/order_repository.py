@@ -59,6 +59,15 @@ class OrderRepository:
     def delete_item(self, position_id):
         db.execute("DELETE FROM orderitems WHERE position_id = %s", (position_id,))
 
+    def get_order_detail(self, order_id):
+        query = """
+        SELECT o.*, c.customer_name, c.phone, c.email
+        FROM orders o
+        LEFT JOIN customers c ON o.customer_id = c.customer_id
+        WHERE o.order_id = %s
+        """
+        return db.fetch_one(query, (order_id,))
+
     def get_all_customers(self):
         return db.fetch_all("SELECT * FROM customers ORDER BY customer_name")
 

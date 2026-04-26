@@ -1,10 +1,12 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox,
-    QTableWidget, QTableWidgetItem, QSplitter, QLabel
+    QTableWidget, QTableWidgetItem, QSplitter, QLabel, QMessageBox,
+    QFileDialog
 )
 from PyQt6.QtCore import Qt
 from repositories.order_repository import OrderRepository
 from repositories.customer_repository import CustomerRepository
+from services.pdf_reports import ReportService
 
 
 class UserHistoryTab(QWidget):
@@ -15,6 +17,7 @@ class UserHistoryTab(QWidget):
 
         self.customer_combo = QComboBox()
         self.refresh_btn = QPushButton("Обновить")
+        self.contract_btn = QPushButton("Договор")
         self.customer_combo.currentIndexChanged.connect(self.load_orders)
 
         self.order_table = QTableWidget()
@@ -32,6 +35,7 @@ class UserHistoryTab(QWidget):
         top.addWidget(QLabel("Покупатель:"))
         top.addWidget(self.customer_combo, 1)
         top.addWidget(self.refresh_btn)
+        top.addWidget(self.contract_btn)
 
         top_widget = QWidget()
         top_layout = QVBoxLayout()
@@ -56,6 +60,7 @@ class UserHistoryTab(QWidget):
         self.setLayout(layout)
 
         self.refresh_btn.clicked.connect(self.refresh_customers)
+        self.contract_btn.clicked.connect(self.export_contract)
 
     def refresh_customers(self):
         self.customer_combo.blockSignals(True)
@@ -82,6 +87,26 @@ class UserHistoryTab(QWidget):
             self.order_table.setItem(i, 3, QTableWidgetItem(f'{float(r.get("discount", 0)):.2f}%'))
         self.order_table.resizeColumnsToContents()
         self.load_items()
+
+    def export_contract(self):
+        row = self.order_table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Ошибка", "Выберите заказ")
+            return
+        order_id_item = self.order_table.item(row, 0)
+        if not order_id_item:
+            return
+        order_id = int(order_id_item.text())
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Договор купли-продажи",
+            f"Договор_купли_продажи_{order_id}.pdf", "PDF Files (*.pdf)")
+        if not path:
+            return
+        try:
+            ReportService().purchase_contract(path, order_id)
+            import os; os.startfile(path)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось создать договор:\n{e}")
 
     def load_items(self):
         row = self.order_table.currentRow()

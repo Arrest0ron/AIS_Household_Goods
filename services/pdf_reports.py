@@ -13,6 +13,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from repositories.report_repository import ReportRepository
 from repositories.supply_repository import SupplyRepository
+from repositories.order_repository import OrderRepository
 from datetime import datetime
 
 
@@ -239,7 +240,8 @@ class ReportService:
         sig_style = ParagraphStyle("Signature",
             fontSize=10, leading=14, spaceBefore=30)
         hdr_style = ParagraphStyle("H", fontSize=9,
-            fontName="Helvetica-Bold", alignment=TA_CENTER)
+            fontName="Helvetica-Bold", alignment=TA_CENTER,
+            textColor=colors.white)
         cell_style = ParagraphStyle("Cell", fontSize=9)
         cell_center = ParagraphStyle("CellCenter", parent=cell_style,
             alignment=TA_CENTER)
@@ -299,11 +301,11 @@ class ReportService:
         col_widths = [20, 170, 50, 60, 60]
         t = Table(data, colWidths=col_widths, repeatRows=1)
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2F5496")),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#333333")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("GRID", (0, 0), (-1, -2), 0.5, colors.HexColor("#D9D9D9")),
-            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E8E0F7")),
-            ("GRID", (0, -1), (-1, -1), 0.5, colors.HexColor("#2F5496")),
+            ("GRID", (0, 0), (-1, -2), 0.5, colors.HexColor("#999999")),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E8E8E8")),
+            ("GRID", (0, -1), (-1, -1), 0.5, colors.HexColor("#333333")),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("TOPPADDING", (0, 0), (-1, -1), 4),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
@@ -341,5 +343,159 @@ class ReportService:
             frames=[Frame(20*mm, 20*mm, page_size[0] - 40*mm,
                           page_size[1] - 40*mm, id="normal")]
         )
+        doc.addPageTemplates([template])
+        doc.build(elements)
+
+    def purchase_contract(self, filepath, order_id):
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import Paragraph, Spacer, Table
+        from reportlab.lib.units import mm
+
+        order_repo = OrderRepository()
+        order = order_repo.get_order_detail(order_id)
+        if not order:
+            raise ValueError(f"Заказ #{order_id} не найден")
+
+        items = order_repo.get_items(order_id)
+
+        title_style = ParagraphStyle("ContractTitle",
+            fontSize=16, spaceAfter=4, alignment=TA_CENTER,
+            fontName="Helvetica-Bold")
+        subtitle_style = ParagraphStyle("ContractSub",
+            fontSize=10, alignment=TA_CENTER, spaceAfter=20)
+        normal = ParagraphStyle("ContractNormal",
+            fontSize=10, leading=14, spaceAfter=4)
+        bold_style = ParagraphStyle("ContractBold", parent=normal,
+            fontName="Helvetica-Bold", spaceAfter=10)
+        sig_style = ParagraphStyle("Signature",
+            fontSize=10, leading=14, spaceBefore=30)
+        hdr_style = ParagraphStyle("H", fontSize=9,
+            fontName="Helvetica-Bold", alignment=TA_CENTER,
+            textColor=colors.white)
+        cell_style = ParagraphStyle("Cell", fontSize=9)
+        cell_center = ParagraphStyle("CellCenter", parent=cell_style,
+            alignment=TA_CENTER)
+
+        elements = []
+
+        elements.append(Paragraph("ДОГОВОР КУПЛИ-ПРОДАЖИ", title_style))
+        elements.append(Paragraph(f"№ {order_id}  от  {order['order_date']}", subtitle_style))
+        elements.append(Paragraph("г. Москва", subtitle_style))
+        elements.append(Spacer(1, 6*mm))
+
+        elements.append(Paragraph(
+            f'<b>Продавец:</b> АИС Магазин бытовых товаров', normal))
+        elements.append(Paragraph(
+            f'<b>Покупатель:</b> {order["customer_name"]}', normal))
+        if order.get("phone"):
+            elements.append(Paragraph(
+                f'<b>Телефон:</b> {order["phone"]}', normal))
+        if order.get("email"):
+            elements.append(Paragraph(
+                f'<b>Email:</b> {order["email"]}', normal))
+        if order.get("description"):
+            elements.append(Paragraph(
+                f'<b>Описание заказа:</b> {order["description"]}', normal))
+        delivery = "Да" if order.get("delivery_needed") else "Нет"
+        dt = order.get("delivery_time")
+        delivery_str = f"Да ({dt})" if dt and order.get("delivery_needed") else delivery
+        elements.append(Paragraph(
+            f'<b>Доставка:</b> {delivery_str}', normal))
+        elements.append(Spacer(1, 4*mm))
+
+        elements.append(Paragraph(
+            "Настоящий Договор составлен о том, что Продавец передает, "
+            "а Покупатель принимает и оплачивает следующий товар:",
+            normal))
+        elements.append(Spacer(1, 4*mm))
+
+        headers = ["№", "Наименование", "Цена (₽)", "Кол-во", "Сумма (₽)"]
+        data = [[Paragraph(h, hdr_style) for h in headers]]
+
+        discount = float(order.get("discount", 0))
+        subtotal = 0
+        for i, item in enumerate(items):
+            price = float(item["price"]) if item.get("price") else 0
+            qty = item["amount"]
+            amount = price * qty
+            subtotal += amount
+            data.append([
+                Paragraph(str(i + 1), cell_center),
+                Paragraph(item["item_name"], cell_style),
+                Paragraph(f"{price:.2f}", cell_center),
+                Paragraph(str(qty), cell_center),
+                Paragraph(f"{amount:.2f}", cell_center),
+            ])
+
+        data.append([
+            Paragraph("", cell_center),
+            Paragraph("<b>Подытог:</b>", ParagraphStyle("Subtotal", fontSize=9,
+                fontName="Helvetica-Bold", alignment=TA_CENTER)),
+            Paragraph("", cell_center),
+            Paragraph("", cell_center),
+            Paragraph(f"<b>{subtotal:.2f}</b>", ParagraphStyle("SubtotalVal",
+                fontSize=9, fontName="Helvetica-Bold", alignment=TA_CENTER)),
+        ])
+        data.append([
+            Paragraph("", cell_center),
+            Paragraph("<b>Скидка:</b>", ParagraphStyle("Disc", fontSize=9,
+                fontName="Helvetica-Bold", alignment=TA_CENTER)),
+            Paragraph("", cell_center),
+            Paragraph("", cell_center),
+            Paragraph(f"<b>{discount:.2f}%</b>", ParagraphStyle("DiscVal",
+                fontSize=9, fontName="Helvetica-Bold", alignment=TA_CENTER)),
+        ])
+        total = subtotal * (1 - discount / 100)
+        data.append([
+            Paragraph("", cell_center),
+            Paragraph("<b>ИТОГО к оплате:</b>", ParagraphStyle("TotalH",
+                fontSize=9, fontName="Helvetica-Bold", alignment=TA_CENTER)),
+            Paragraph("", cell_center),
+            Paragraph("", cell_center),
+            Paragraph(f"<b>{total:.2f}</b>", ParagraphStyle("TotalVal",
+                fontSize=9, fontName="Helvetica-Bold", alignment=TA_CENTER)),
+        ])
+
+        t = Table(data, colWidths=[20, 150, 60, 50, 60], repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#333333")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -4), 0.5, colors.HexColor("#999999")),
+            ("BACKGROUND", (0, -3), (-1, -1), colors.HexColor("#E8E8E8")),
+            ("LINEBELOW", (0, -4), (-1, -4), 1, colors.HexColor("#333333")),
+            ("GRID", (0, -3), (-1, -1), 0.5, colors.HexColor("#333333")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 10*mm))
+
+        elements.append(Paragraph(
+            f"<b>Общая сумма Договора:</b> {total:,.2f} руб.",
+            bold_style))
+        if discount > 0:
+            elements.append(Paragraph(
+                f"Сумма с учетом скидки {discount:.0f}%", normal))
+        elements.append(Spacer(1, 10*mm))
+
+        sig_table = Table([
+            [Paragraph("Продавец:", sig_style),
+             Paragraph("Покупатель:", sig_style)],
+            [Paragraph("_____________ /______________/", sig_style),
+             Paragraph("_____________ /______________/", sig_style)],
+            [Paragraph("М.П.", sig_style),
+             Paragraph("М.П.", sig_style)],
+        ], colWidths=[90*mm, 90*mm])
+        sig_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+        elements.append(sig_table)
+
+        doc = SimpleDocTemplate(filepath, pagesize=A4,
+            topMargin=20*mm, bottomMargin=20*mm,
+            leftMargin=20*mm, rightMargin=20*mm)
+        template = PageTemplate(
+            onPage=lambda c, d: None,
+            frames=[Frame(20*mm, 20*mm, A4[0] - 40*mm,
+                          A4[1] - 40*mm, id="normal")])
         doc.addPageTemplates([template])
         doc.build(elements)
