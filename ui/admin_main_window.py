@@ -18,7 +18,8 @@ class AdminMainWindow(QMainWindow):
         super().__init__()
         self.login_window = login_window
         self.setWindowTitle("AIS_Shop — Администратор")
-        self.resize(1400, 800)
+        self.showMaximized()
+        self.setMaximumWidth(1400)
 
         # Header
         header = QWidget()

@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QGroupBox, QLabel,
-    QFileDialog, QMessageBox
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QTextEdit, QGroupBox,
+    QLabel, QFileDialog, QMessageBox
 )
 from PyQt6.QtGui import QTextDocument, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
@@ -31,8 +31,10 @@ class ReportsTab(QWidget):
         btn_summary = QPushButton("Обновить сводку")
         btn_summary.clicked.connect(self.show_summary)
 
-        preview_buttons = []
-        for label, method in [
+        btn_pdf = QPushButton("Экспорт PDF")
+        btn_pdf.clicked.connect(self.export_pdf)
+
+        preview_actions = [
             ("Товары", self.preview_items),
             ("Категории", self.preview_categories),
             ("Поставщики", self.preview_suppliers),
@@ -41,18 +43,22 @@ class ReportsTab(QWidget):
             ("Заказы", self.preview_orders),
             ("Запасы", self.preview_stock),
             ("Малые остатки", self.preview_low_stock),
-        ]:
-            b = QPushButton(label)
-            b.clicked.connect(method)
-            preview_buttons.append(b)
+        ]
 
-        pdf_btn = QPushButton("Экспорт PDF")
-        pdf_btn.clicked.connect(self.export_pdf)
-        preview_buttons.append(pdf_btn)
+        preview_group = QGroupBox("Просмотр")
+        preview_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        grid = QGridLayout()
+        cols = 4
+        for i, (label, method) in enumerate(preview_actions):
+            b = QPushButton(label)
+            b.setStyleSheet(style)
+            b.clicked.connect(method)
+            grid.addWidget(b, i // cols, i % cols)
+        preview_group.setLayout(grid)
 
         layout = QVBoxLayout()
-        layout.addWidget(make_group("Сводка", [btn_summary]))
-        layout.addWidget(make_group("Просмотр", preview_buttons))
+        layout.addWidget(make_group("Сводка", [btn_summary, btn_pdf]))
+        layout.addWidget(preview_group)
         layout.addWidget(QLabel("Предпросмотр:"))
         layout.addWidget(self.text_edit)
         self.setLayout(layout)
