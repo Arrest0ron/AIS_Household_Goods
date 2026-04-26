@@ -9,9 +9,15 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.frames import Frame
 from reportlab.platypus.doctemplate import PageTemplate
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from repositories.report_repository import ReportRepository
 from repositories.supply_repository import SupplyRepository
 from datetime import datetime
+
+
+pdfmetrics.registerFont(TTFont("Helvetica", "C:\\Windows\\Fonts\\arial.ttf"))
+pdfmetrics.registerFont(TTFont("Helvetica-Bold", "C:\\Windows\\Fonts\\arialbd.ttf"))
 
 
 class PDFReport:
@@ -208,8 +214,11 @@ class ReportService:
 
     def supply_contract(self, filepath, supply_id):
         from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import Paragraph, Spacer, Table
+        from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib import colors
         from reportlab.lib.units import mm
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER
 
         supply_repo = SupplyRepository()
         supply = supply_repo.get_supply_detail(supply_id)
@@ -217,7 +226,6 @@ class ReportService:
             raise ValueError(f"Поставка #{supply_id} не найдена")
 
         items = supply_repo.get_items_with_prices(supply_id)
-        styles = getSampleStyleSheet()
 
         title_style = ParagraphStyle("ContractTitle",
             fontSize=16, spaceAfter=4, alignment=TA_CENTER,
@@ -244,12 +252,15 @@ class ReportService:
         elements.append(Spacer(1, 6*mm))
 
         elements.append(Paragraph(
-            f'<b>Поставщик:</b> {supply["supplier_name"]}', normal))
+            f'<b>Поставщик:</b> {supply["supplier_name"]}',
+            normal))
         if supply.get("contact_info"):
             elements.append(Paragraph(
-                f'<b>Контактные данные:</b> {supply["contact_info"]}', normal))
+                f'<b>Контактные данные:</b> {supply["contact_info"]}',
+                normal))
         elements.append(Paragraph(
-            f'<b>Склад отгрузки:</b> {supply["warehouse_address"]}', normal))
+            f'<b>Склад отгрузки:</b> {supply["warehouse_address"]}',
+            normal))
         elements.append(Spacer(1, 4*mm))
 
         elements.append(Paragraph(
@@ -285,7 +296,8 @@ class ReportService:
             Paragraph(f"<b>{total:.2f}</b>", total_bold_center),
         ])
 
-        t = Table(data, colWidths=[20, 170, 50, 60, 60], repeatRows=1)
+        col_widths = [20, 170, 50, 60, 60]
+        t = Table(data, colWidths=col_widths, repeatRows=1)
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2F5496")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -299,8 +311,9 @@ class ReportService:
         elements.append(t)
         elements.append(Spacer(1, 10*mm))
 
+        total_in_words = f"{total:,.2f}".replace(",", " ")
         elements.append(Paragraph(
-            f"<b>Общая сумма Договора:</b> {total:,.2f} руб.",
+            f"<b>Общая сумма Договора:</b> {total_in_words} руб.",
             bold_style))
         elements.append(Spacer(1, 10*mm))
 
@@ -312,15 +325,21 @@ class ReportService:
             [Paragraph("М.П.", sig_style),
              Paragraph("М.П.", sig_style)],
         ], colWidths=[90*mm, 90*mm])
-        sig_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+        sig_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
         elements.append(sig_table)
 
-        doc = SimpleDocTemplate(filepath, pagesize=A4,
+        page_size = A4
+        doc = SimpleDocTemplate(
+            filepath, pagesize=page_size,
             topMargin=20*mm, bottomMargin=20*mm,
-            leftMargin=20*mm, rightMargin=20*mm)
+            leftMargin=20*mm, rightMargin=20*mm
+        )
         template = PageTemplate(
             onPage=lambda c, d: None,
-            frames=[Frame(20*mm, 20*mm, A4[0] - 40*mm,
-                          A4[1] - 40*mm, id="normal")])
+            frames=[Frame(20*mm, 20*mm, page_size[0] - 40*mm,
+                          page_size[1] - 40*mm, id="normal")]
+        )
         doc.addPageTemplates([template])
         doc.build(elements)
